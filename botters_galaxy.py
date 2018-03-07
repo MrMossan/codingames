@@ -10,8 +10,8 @@ def print_err(arg):
     print >> sys.stderr, arg
 
 def print_out(arg):
-    print_err(arg)
     print arg
+    print_err(arg)
 
 my_team = int(raw_input())
 bush_and_spawn_point_count = int(raw_input())  # useful from wood1, represents the number of bushes and the number of places where neutral units can spawn
@@ -98,6 +98,23 @@ def read_unit_input():
     return Unit(unit_id, team, unit_type, x, y, attack_range, health, max_health, shield, attack_damage, movement_speed,
                 stun_duration, gold_value, count_down_1, count_down_2, count_down_3, mana, max_mana, mana_regeneration,
                 hero_type, is_visible, items_owned)
+
+
+def buy_health_potion_if_can(_gold):
+    try:
+        potion = next(item for item in item_store if item.is_potion == 1 and item.health > 0)
+        print_out("BUY " + potion.item_name)
+        return True
+    except StopIteration:
+        return False
+
+def itemize_or_wait(gameturn, h):
+
+    if h.health < h.max_health:
+         if buy_health_potion_if_can(gameturn.gold):
+             return
+    print_out("WAIT")
+
 
 
 class PriorityLevel(object):
@@ -196,12 +213,13 @@ class MoveBehindWave(Action):
             if self.enemy_units:
 
                 if h.hero_type == "IRONMAN" and h.mana > 16 and h.count_down_1 == 0:
+                    print_err("BLINK CD: " + h.hero_type + " " + str(h.count_down_1))
                     print_out("BLINK " + str(target_pos.x) + " " + str(target_pos.y))
                 else:
-                    closest_enemy = min(self.enemy_units + self.game_turn.enemy_heroes, key=lambda x: distance(x,target_pos))
+                    closest_enemy = min(self.enemy_units + self.game_turn.enemy_heroes, key=lambda x: distance(x, target_pos))
                     print_out("MOVE_ATTACK " + str(target_pos.x) + " " + str(target_pos.y) + " " + str(closest_enemy.unit_id))
             else:
-                print_out("MOVE" + str(target_pos.x) + " " + str(target_pos.y))
+                print_out("MOVE " + str(target_pos.x) + " " + str(target_pos.y))
 
 
 class Farming(Action):
@@ -241,7 +259,7 @@ class Farming(Action):
                 target = min(self.enemy_units, key=lambda u: distance(h, u))
                 print_out("ATTACK " + str(target.unit_id))
 
-            print_out("WAIT")
+            itemize_or_wait(self.game_turn, h)
 
 
 class AttackEnemyHeroes(Action):
@@ -254,8 +272,7 @@ class AttackEnemyHeroes(Action):
 
     def can_realize(self):
         """Only possible if enemy in range"""
-        return any(distance(h, eh) < h.attack_range
-                   for h in self.game_turn.my_heroes
+        return any(distance(h, eh) < 500 for h in self.game_turn.my_heroes
                    for eh in self.game_turn.enemy_heroes)
 
     def get_priority(self):
@@ -300,7 +317,7 @@ class AttackEnemyHeroes(Action):
                 elif h.mana > 50 and h.count_down_3 == 0 and distance(h, target) < 150:
                     print_out("POWERUP")
                 else:
-                    print_out("ATTACK " + str(target.unit_id))
+                    print_out("MOVE_ATTACK " + str(target.x) + " " + str(target.y) + " "+ str(target.unit_id))
 
 print("IRONMAN")
 print("VALKYRIE")
@@ -337,8 +354,8 @@ class GameTurn(object):
             print_err("APPLYING " + str(picked_action))
             picked_action.apply_action()
         else:
-            print_out("WAIT")
-            print_out("WAIT")
+            itemize_or_wait(self, self.my_heroes[0])
+            itemize_or_wait(self, self.my_heroes[1])
 
 
 # game loop
